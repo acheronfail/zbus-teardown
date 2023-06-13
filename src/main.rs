@@ -48,6 +48,11 @@ async fn async_main() {
             cancel.cancelled().await;
         }
         // NOTE: this one *does not panic* on drop
+        "spawn" => {
+            tokio::task::spawn(spawn_task());
+            cancel.cancelled().await;
+        }
+        // NOTE: this one *does not panic* on drop
         "select" => {
             tokio::select! {
                 _ = spawn_task() => {},
@@ -55,7 +60,7 @@ async fn async_main() {
             };
         }
         _ => {
-            eprintln!("Pass either 'select' or 'spawn_local'");
+            eprintln!("Pass either 'select', 'spawn' or 'spawn_local'");
             std::process::exit(1);
         }
     };
