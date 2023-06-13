@@ -61,10 +61,19 @@ async fn async_main() {
     };
 }
 
+// explicitly logs when dropped so we can confirm when the drop occurs
+struct Foo;
+impl Drop for Foo {
+    fn drop(&mut self) {
+        eprintln!("dropping");
+    }
+}
+
 async fn spawn_task() {
     let connection = Connection::system().await.unwrap();
     let nm_proxy = NetworkManagerProxy::new(&connection).await.unwrap();
     let _stream = nm_proxy.receive_state_changed().await.unwrap();
+    let _foo = Foo;
 
     eprintln!("zbus stream created");
 
