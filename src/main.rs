@@ -10,7 +10,7 @@ use zbus::Connection;
     default_path = "/org/freedesktop/NetworkManager",
     default_service = "org.freedesktop.NetworkManager",
     interface = "org.freedesktop.NetworkManager",
-    gen_blocking = false
+    gen_blocking = true
 )]
 pub trait NetworkManager {
     #[dbus_proxy(signal)]
@@ -41,16 +41,33 @@ async fn async_main() {
         }
     });
 
-    // create a new task to listen to network manager changes via zbus
-    tokio::task::spawn_local(async move {
-        let connection = Connection::system().await.unwrap();
-        let nm_proxy = NetworkManagerProxy::new(&connection).await.unwrap();
-        let _stream = nm_proxy.receive_state_changed().await.unwrap();
+    match std::env::args().skip(1).next().unwrap().as_str() {
+        // NOTE: this one panics on drop
+        "spawn_local" => {
+            tokio::task::spawn_local(spawn_task());
+            cancel.cancelled().await;
+        }
+        // NOTE: this one *does not panic* on drop
+        "select" => {
+            tokio::select! {
+                _ = spawn_task() => {},
+                _ = cancel.cancelled() => {},
+            };
+        }
+        _ => {
+            eprintln!("Pass either 'select' or 'spawn_local'");
+            std::process::exit(1);
+        }
+    };
+}
 
-        // used to ensure this task never completes
-        futures::future::pending::<()>().await;
-    });
+async fn spawn_task() {
+    let connection = Connection::system().await.unwrap();
+    let nm_proxy = NetworkManagerProxy::new(&connection).await.unwrap();
+    let _stream = nm_proxy.receive_state_changed().await.unwrap();
 
-    // wait for runtime to be cancelled
-    cancel.cancelled().await;
+    eprintln!("zbus stream created");
+
+    // used to ensure this task never completes
+    futures::future::pending::<()>().await;
 }
